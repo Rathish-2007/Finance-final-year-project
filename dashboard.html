@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+  <h2>One technique. <span>Five gaps closed.</span></h2>
+  <p>
+    <b>RASTA-QF</b> — Regime-Aware Sentiment-Threshold Adaptive Quantile-Frequency Connectedness
+    &amp; Trading Intelligence. A unified pipeline that fuses probabilistic jump regimes (CJM),
+    joint topic–sentiment document embeddings (SSCDV), time-varying quantile-frequency connectedness
+    (TVP-VAR + QQC), threshold &amp; stability tests (Hansen · Granger · run-risk VAR) and a
+    hierarchical multi-agent DRL trader with realistic frictions — all on one 10-asset benchmark.
+  </p>
+</div>
+
+<!-- KPI strip -->
+<div class="grid g4" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">Benchmark span</span><span class="v grad" id="kpiDays">—</span><span class="s" id="kpiRange">loading…</span></div>
+  <div class="card kpi"><span class="k">Regime recovery (CJM)</span><span class="v" id="kpiRegime">—</span><span class="s">vs synthetic ground truth</span></div>
+  <div class="card kpi"><span class="k">Connectedness TCI (τ=0.5)</span><span class="v" id="kpiTci">—</span><span class="s">latest window · Diebold-Yilmaz</span></div>
+  <div class="card kpi"><span class="k">DRL OOS Sharpe</span><span class="v" id="kpiSharpe">—</span><span class="s">hierarchical agent · 2023-24</span></div>
+</div>
+
+<!-- architecture -->
+<div class="card" style="margin-bottom:16px;">
+  <h3>System architecture <span class="tag">end-to-end pipeline</span></h3>
+  <svg viewBox="0 0 1180 250" width="100%" style="max-width:1180px; display:block; margin:0 auto;">
+    <defs>
+      <linearGradient id="gx" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#c084fc"/>
+      </linearGradient>
+      <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+        <path d="M0,0 L8,4 L0,8 z" fill="#6784bb"/>
+      </marker>
+    </defs>
+    <g font-family="Inter, sans-serif">
+      <rect x="10" y="30" width="170" height="92" rx="12" fill="#101a2e" stroke="#22d3ee55"/>
+      <text x="95" y="58" fill="#22d3ee" font-size="12" font-weight="700" text-anchor="middle">M1 · DATA LAKE</text>
+      <text x="95" y="78" fill="#8b9bb8" font-size="10.5" text-anchor="middle">10 assets · 2016-24</text>
+      <text x="95" y="94" fill="#8b9bb8" font-size="10.5" text-anchor="middle">GARCH normalisation</text>
+      <text x="95" y="110" fill="#5d6b87" font-size="9.5" text-anchor="middle">closes G1 · G3</text>
+
+      <rect x="215" y="30" width="170" height="92" rx="12" fill="#101a2e" stroke="#a78bfa55"/>
+      <text x="300" y="58" fill="#a78bfa" font-size="12" font-weight="700" text-anchor="middle">M2 · SSCDV</text>
+      <text x="300" y="78" fill="#8b9bb8" font-size="10.5" text-anchor="middle">tfidf · topic ⊗ sentiment</text>
+      <text x="300" y="94" fill="#8b9bb8" font-size="10.5" text-anchor="middle">⊗ word2vec → PCA-50</text>
+      <text x="300" y="110" fill="#5d6b87" font-size="9.5" text-anchor="middle">closes G3 (features)</text>
+
+      <rect x="420" y="30" width="170" height="92" rx="12" fill="#101a2e" stroke="#34d39955"/>
+      <text x="505" y="58" fill="#34d399" font-size="12" font-weight="700" text-anchor="middle">M3 · CJM REGIMES</text>
+      <text x="505" y="78" fill="#8b9bb8" font-size="10.5" text-anchor="middle">multi-start HMM</text>
+      <text x="505" y="94" fill="#8b9bb8" font-size="10.5" text-anchor="middle">p_bull · p_bear · p_high</text>
+      <text x="505" y="110" fill="#5d6b87" font-size="9.5" text-anchor="middle">closes G2 (regimes)</text>
+
+      <rect x="625" y="30" width="170" height="92" rx="12" fill="#101a2e" stroke="#60a5fa55"/>
+      <text x="710" y="58" fill="#60a5fa" font-size="12" font-weight="700" text-anchor="middle">M4 · TVP-VAR + QQC</text>
+      <text x="710" y="78" fill="#8b9bb8" font-size="10.5" text-anchor="middle">rolling VAR · FEVD</text>
+      <text x="710" y="94" fill="#8b9bb8" font-size="10.5" text-anchor="middle">τ = .05 / .50 / .95</text>
+      <text x="710" y="110" fill="#5d6b87" font-size="9.5" text-anchor="middle">closes G2 (quantiles)</text>
+
+      <rect x="830" y="30" width="170" height="92" rx="12" fill="#101a2e" stroke="#fbbf2455"/>
+      <text x="915" y="58" fill="#fbbf24" font-size="12" font-weight="700" text-anchor="middle">M5 · RISK LAB</text>
+      <text x="915" y="78" fill="#8b9bb8" font-size="10.5" text-anchor="middle">Hansen threshold</text>
+      <text x="915" y="94" fill="#8b9bb8" font-size="10.5" text-anchor="middle">Granger · run-risk VAR</text>
+      <text x="915" y="110" fill="#5d6b87" font-size="9.5" text-anchor="middle">closes G5</text>
+
+      <rect x="1035" y="30" width="135" height="92" rx="12" fill="#101a2e" stroke="url(#gx)" stroke-width="1.5"/>
+      <text x="1102" y="58" fill="url(#gx)" font-size="12" font-weight="800" text-anchor="middle">M6 · DRL</text>
+      <text x="1102" y="78" fill="#8b9bb8" font-size="10.5" text-anchor="middle">H→M→L distill</text>
+      <text x="1102" y="94" fill="#8b9bb8" font-size="10.5" text-anchor="middle">costs + SHAP</text>
+      <text x="1102" y="110" fill="#5d6b87" font-size="9.5" text-anchor="middle">closes G4</text>
+
+      <line x1="180" y1="76" x2="213" y2="76" stroke="#6784bb" marker-end="url(#ar)"/>
+      <line x1="385" y1="76" x2="418" y2="76" stroke="#6784bb" marker-end="url(#ar)"/>
+      <line x1="590" y1="76" x2="623" y2="76" stroke="#6784bb" marker-end="url(#ar)"/>
+      <line x1="795" y1="76" x2="828" y2="76" stroke="#6784bb" marker-end="url(#ar)"/>
+      <line x1="1000" y1="76" x2="1033" y2="76" stroke="#6784bb" marker-end="url(#ar)"/>
+
+      <!-- feature bus -->
+      <rect x="215" y="168" width="990" height="44" rx="10" fill="#0c1424" stroke="#6784bb33"/>
+      <text x="710" y="186" fill="#8b9bb8" font-size="10.5" text-anchor="middle">
+        DRL state space — 20 technical + 10 SSCDV + 3 regime probabilities + 1 TCI (34 dims demo · 134 dims production)
+      </text>
+      <text x="710" y="202" fill="#5d6b87" font-size="9.5" text-anchor="middle">reward = return − 0.10% commission − 0.05% slippage − λ·pos²·σ²</text>
+      <path d="M300,122 L300,166" stroke="#6784bb66" stroke-dasharray="3,3"/>
+      <path d="M505,122 L505,166" stroke="#6784bb66" stroke-dasharray="3,3"/>
+      <path d="M710,122 L710,166" stroke="#6784bb66" stroke-dasharray="3,3"/>
+      <path d="M915,122 L915,166" stroke="#6784bb66" stroke-dasharray="3,3"/>
+      <path d="M1102,166 L1102,122" stroke="#6784bb66" stroke-dasharray="3,3"/>
+    </g>
+  </svg>
+</div>
+
+<!-- pipeline status -->
+<div class="card" style="margin-bottom:16px;">
+  <h3>Pipeline status <span class="tag" id="allStatus">—</span></h3>
+  <div class="grid g3">
+    {% for m, label in module_list %}
+    <div class="card" style="background:var(--panel-2); padding:16px 18px;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <b style="font-size:13.5px;">{{ label }}</b>
+        <span class="badge muted" data-mod-badge="{{ m }}" style="margin-left:auto;">PENDING</span>
+      </div>
+      <div class="progress"><div data-mod-bar="{{ m }}" style="width:0%"></div></div>
+      <div class="note" data-mod-msg="{{ m }}">not started</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- console -->
+<div class="card">
+  <h3>Execution log</h3>
+  <div class="console" id="console"><div class="ln"><span class="ts">--:--:--</span><span class="md">system</span><span>waiting for pipeline activity…</span></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODULES = {{ module_json|safe }};
+
+async function loadKpis() {
+  const d = await moduleData("data");
+  if (d) {
+    document.getElementById("kpiDays").textContent = d.n_days.toLocaleString() + "d";
+    document.getElementById("kpiRange").textContent = `${d.start} → ${d.end} · ${d.source}`;
+  }
+  const r = await moduleData("regimes");
+  if (r) document.getElementById("kpiRegime").textContent = r.state_accuracy_vs_truth + "%";
+  const c = await moduleData("connectedness");
+  if (c) document.getElementById("kpiTci").textContent = fmt(c.summary["0.5"].tci, 1) + "%";
+  const m = await moduleData("drl");
+  if (m) {
+    const s = m.metrics["RASTA-QF Hierarchical"].sharpe;
+    const el = document.getElementById("kpiSharpe");
+    el.textContent = fmt(s, 2);
+    el.classList.add(s >= 0 ? "pos" : "neg");
+  }
+}
+
+async function loadLogs() {
+  const r = await api("/api/logs");
+  const el = document.getElementById("console");
+  if (!r.logs.length) return;
+  el.innerHTML = r.logs.slice().reverse().map(l =>
+    `<div class="ln"><span class="ts">${l.ts}</span><span class="md">${l.module}</span><span class="${l.level === "ERROR" ? "er" : ""}">${l.message}</span></div>`
+  ).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadKpis(); loadLogs();
+  refreshStatus().then(st => {
+    const n = Object.values(st.modules).filter(m => m.status === "done").length;
+    document.getElementById("allStatus").textContent = `${n}/6 modules complete`;
+  });
+  startPolling(() => { loadKpis(); loadLogs(); refreshStatus().then(st => {
+    const n = Object.values(st.modules).filter(m => m.status === "done").length;
+    document.getElementById("allStatus").textContent = `${n}/6 modules complete`; }); });
+});
+</script>
+{% endblock %}

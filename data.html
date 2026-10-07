@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g4" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">Trading days</span><span class="v grad" id="kDays">—</span><span class="s" id="kRange"></span></div>
+  <div class="card kpi"><span class="k">Assets</span><span class="v" id="kAssets">10</span><span class="s">7-asset connectedness core</span></div>
+  <div class="card kpi"><span class="k">Data source</span><span class="v" style="font-size:19px;" id="kSrc">—</span><span class="s">deterministic · seed 42</span></div>
+  <div class="card kpi"><span class="k">Best Sharpe (panel)</span><span class="v pos" id="kSharpe">—</span><span class="s" id="kSharpeSym"></span></div>
+</div>
+
+<div class="grid g-2-1" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Price levels (selected assets, reindexed view)</h3>
+    <div class="chart-wrap tall"><canvas id="prices"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>Google SVI — crisis attention</h3>
+    <div class="chart-wrap short"><canvas id="svi"></canvas></div>
+    <div class="divider"></div>
+    <h3>News flow (docs/day)</h3>
+    <div class="chart-wrap short"><canvas id="news"></canvas></div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Asset panel — annualised statistics <span class="tag">log returns · full sample</span></h3>
+    <div style="overflow-x:auto;"><table class="tbl" id="statTable">
+      <thead><tr><th>Asset</th><th>Class</th><th class="num">Ann. ret %</th><th class="num">Ann. vol %</th>
+      <th class="num">Sharpe</th><th class="num">Max DD %</th><th class="num">Skew</th><th class="num">Kurt</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <h3>Correlation — CORE7 daily returns</h3>
+    <div style="overflow-x:auto;"><table class="tbl" id="corrTable"></table></div>
+    <div class="note">Raddant-style GARCH/EWMA normalisation is applied before connectedness estimation; correlations shown on raw log returns.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const d = await moduleData("data");
+  if (!d) { showEmpty("statTable"); return; }
+
+  document.getElementById("kDays").textContent = d.n_days.toLocaleString();
+  document.getElementById("kRange").textContent = `${d.start} → ${d.end}`;
+  document.getElementById("kSrc").textContent = d.source;
+  const best = d.stats.reduce((a, b) => a.sharpe > b.sharpe ? a : b);
+  document.getElementById("kSharpe").textContent = fmt(best.sharpe);
+  document.getElementById("kSharpeSym").textContent = best.sym + " · " + best.name;
+
+  // price chart (normalised to 100)
+  const colors = [C.cyan, C.violet, C.amber, C.green, C.blue, C.pink];
+  lineChart("prices", d.prices.SPX.dates,
+    Object.entries(d.prices).map(([sym, s], i) => {
+      const base = s.values[0];
+      return { label: sym, data: s.values.map(v => 100 * v / base), color: colors[i % 6], width: 1.8 };
+    }), { plugins: { legend: { position: "top" } } });
+
+  lineChart("svi", d.svi.dates, [{ label: "SVI", data: d.svi.values, color: C.amber, fill: true, width: 1.5 }],
+    { plugins: { legend: { display: false } } });
+  lineChart("news", d.news_count.dates, [{ label: "news/day", data: d.news_count.values, color: C.blue, fill: true, width: 1.5 }],
+    { plugins: { legend: { display: false } } });
+
+  const tb = document.querySelector("#statTable tbody");
+  tb.innerHTML = d.stats.map(s => `<tr>
+    <td><b>${s.sym}</b> <span class="note" style="margin:0;">${s.name}</span></td>
+    <td><span class="badge muted">${s.cls}</span></td>
+    <td class="num ${s.ann_ret >= 0 ? "pos" : "neg"}">${fmt(s.ann_ret, 1)}</td>
+    <td class="num">${fmt(s.ann_vol, 1)}</td>
+    <td class="num ${s.sharpe >= 0 ? "pos" : "neg"}">${fmt(s.sharpe)}</td>
+    <td class="num neg">${fmt(s.max_dd, 1)}</td>
+    <td class="num">${fmt(s.skew)}</td>
+    <td class="num">${fmt(s.kurt)}</td></tr>`).join("");
+
+  let html = "<tr><th></th>" + d.corr_labels.map(l => `<th class="num">${l}</th>`).join("") + "</tr>";
+  d.corr.forEach((row, i) => {
+    html += `<tr><td><b>${d.corr_labels[i]}</b></td>` + row.map(v =>
+      `<td><div class="heat" style="background:${heatColor(v)}">${fmt(v, 2)}</div></td>`).join("") + "</tr>";
+  });
+  document.getElementById("corrTable").innerHTML = html;
+});
+</script>
+{% endblock %}

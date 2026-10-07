@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RASTA-QF · {{ title }}</title>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">Q</div>
+      <div class="brand-name">RASTA-QF<small>REGIME · SENTIMENT · CONNECTEDNESS</small></div>
+    </div>
+
+    <div class="nav-label">Framework</div>
+    {% for slug, url, label, ico in nav %}
+      <a class="nav-item {% if active == slug %}active{% endif %}" href="{{ url }}">
+        <span class="ico">{{ ico }}</span> {{ label }}
+        {% if slug == "data" %}<span class="dot" data-mod-dot="data"></span>
+        {% elif slug == "sscdv" %}<span class="dot" data-mod-dot="sscdv"></span>
+        {% elif slug == "regimes" %}<span class="dot" data-mod-dot="regimes"></span>
+        {% elif slug == "connectedness" %}<span class="dot" data-mod-dot="connectedness"></span>
+        {% elif slug == "risk" %}<span class="dot" data-mod-dot="risk"></span>
+        {% elif slug == "drl" %}<span class="dot" data-mod-dot="drl"></span>{% endif %}
+      </a>
+    {% endfor %}
+
+    <div style="margin-top:auto; padding: 14px 10px 4px;">
+      <button id="runBtn" class="btn primary" style="width:100%; justify-content:center;"
+              onclick="runPipeline(['all'], ()=>location.reload())">▶&nbsp; Run Full Pipeline</button>
+      <div class="note" style="margin-top:10px;">10-asset benchmark · 2016–2024<br>seed 42 · deterministic</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="crumb">RASTA-QF / {{ active }}</div>
+        <h1>{{ title }}</h1>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:10px; align-items:center;" id="topExtra"></div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <footer>
+      RASTA-QF · Regime-Aware Sentiment-Threshold Adaptive Quantile-Frequency framework ·
+      research prototype — synthetic benchmark data (deterministic, seed 42)
+    </footer>
+  </main>
+</div>
+<script src="{% static 'js/app.js' %}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

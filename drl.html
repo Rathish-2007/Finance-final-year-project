@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g4" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">Hierarchical OOS Sharpe</span><span class="v" id="kSharpe">—</span><span class="s">2023-24 · net of costs</span></div>
+  <div class="card kpi"><span class="k">OOS total return</span><span class="v" id="kRet">—</span><span class="s" id="kBH"></span></div>
+  <div class="card kpi"><span class="k">Max drawdown</span><span class="v" id="kDD">—</span><span class="s" id="kDDbh"></span></div>
+  <div class="card kpi"><span class="k">State dimension</span><span class="v grad" id="kDim">—</span><span class="s">20 tech + 10 SSCDV + 3 regime + 1 TCI</span></div>
+</div>
+
+<!-- agent hierarchy -->
+<div class="card" style="margin-bottom:16px;">
+  <h3>Hierarchical multi-agent architecture <span class="tag">knowledge distillation H → M → L</span></h3>
+  <div class="grid g3" id="agents"></div>
+  <div class="formula">reward = pos·r<sub>t+1</sub> − 0.10% commission·|Δpos| − 0.05% slippage·|Δpos| − λ·pos²·σ²&nbsp;&nbsp;·&nbsp;&nbsp;γ = 0.60 · Double-DQN · anchored replay</div>
+</div>
+
+<div class="grid g-2-1" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Out-of-sample equity (2023-24)</h3>
+    <div class="chart-wrap tall"><canvas id="equity"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>Explainability — permutation SHAP by feature group <span class="tag">closes G4</span></h3>
+    <div class="chart-wrap short"><canvas id="shap"></canvas></div>
+    <div class="divider"></div>
+    <h3>ML metrics (directional)</h3>
+    <table class="tbl"><tbody id="mlBody"></tbody></table>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>Performance comparison</h3>
+    <table class="tbl" id="perfTable">
+      <thead><tr><th>Strategy</th><th class="num">Total %</th><th class="num">CAGR %</th>
+      <th class="num">Sharpe</th><th class="num">Max DD %</th><th class="num">Vol %</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="note">The regime-blind single-agent baseline receives identical features with the regime block zeroed and no expert anchoring — isolating the value of regime awareness.</div>
+  </div>
+  <div class="card">
+    <h3>Friction model</h3>
+    <table class="tbl" id="costTable"><tbody></tbody></table>
+    <div class="divider"></div>
+    <div class="note">NumPy MLP reference implementation (dependency-light); architecture maps 1:1 onto the PyTorch version described in the paper. Pre-train 2016-20 → fine-tune 2021-22 → evaluate 2023-24, exactly per the guide.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const d = await moduleData("drl");
+  if (!d) { showEmpty("equity"); return; }
+  const m = d.metrics, hier = m["RASTA-QF Hierarchical"], bh = m["Buy & Hold Benchmark"];
+
+  const sh = document.getElementById("kSharpe");
+  sh.textContent = fmt(hier.sharpe); sh.classList.add(hier.sharpe >= 0 ? "pos" : "neg");
+  const rt = document.getElementById("kRet");
+  rt.textContent = fmt(hier.total_return, 1) + "%"; rt.classList.add(hier.total_return >= 0 ? "pos" : "neg");
+  document.getElementById("kBH").textContent = "buy & hold: " + fmt(bh.total_return, 1) + "%";
+  document.getElementById("kDD").textContent = fmt(hier.max_dd, 1) + "%";
+  document.getElementById("kDDbh").textContent = "buy & hold: " + fmt(bh.max_dd, 1) + "%";
+  document.getElementById("kDim").textContent = d.state_dim + "d";
+
+  document.getElementById("agents").innerHTML = d.agents.map((a, i) => `
+    <div class="card" style="background:var(--panel-2); padding:16px 18px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <b style="font-size:14px;">${a.name}</b>
+        <span class="badge info" style="margin-left:auto;">${a.freq}</span>
+      </div>
+      <div class="note" style="margin-top:8px;">${a.role}</div>
+      ${i < 2 ? '<div style="text-align:center; color:var(--faint); font-size:18px; margin-top:8px;">↓ distill</div>' : ''}
+    </div>`).join("");
+
+  lineChart("equity", d.oos_dates, [
+    { label: "RASTA-QF Hierarchical", data: d.equity.hierarchical, color: C.cyan, width: 2.4 },
+    { label: "Single-agent DQN (regime-blind)", data: d.equity.single_agent, color: C.amber, width: 1.6 },
+    { label: "Buy & Hold Benchmark", data: d.equity.buy_hold_benchmark, color: C.red, width: 1.6 },
+  ], { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+                 y: { type: "logarithmic", grid: { color: "rgba(103,132,187,0.10)" } } } });
+
+  const groups = Object.keys(d.explainability), vals = Object.values(d.explainability);
+  barChart("shap", groups, [{ label: "share of |ΔQ| %", data: vals,
+    color: [C.cyan, C.violet, C.green, C.amber].slice(0, groups.length) }],
+    { plugins: { legend: { display: false } } });
+
+  const ml = d.ml_metrics;
+  document.getElementById("mlBody").innerHTML = `
+    <tr><td>Directional accuracy</td><td class="num">${(100 * ml.direction_acc).toFixed(1)}%</td></tr>
+    <tr><td>F1 (up-move)</td><td class="num">${fmt(ml.f1, 3)}</td></tr>
+    <tr><td>Matthews corr.</td><td class="num">${fmt(ml.mcc, 3)}</td></tr>
+    <tr><td>Position changes (OOS)</td><td class="num">${ml.n_trades}</td></tr>`;
+
+  const order = ["RASTA-QF Hierarchical", "Single-agent DQN (regime-blind)", "Buy & Hold Benchmark"];
+  document.querySelector("#perfTable tbody").innerHTML = order.map(name => {
+    const r = m[name];
+    const hl = name.startsWith("RASTA") ? ' style="background:rgba(34,211,238,0.05);"' : "";
+    return `<tr${hl}><td><b>${name}</b></td>
+      <td class="num ${r.total_return >= 0 ? "pos" : "neg"}">${fmt(r.total_return, 1)}</td>
+      <td class="num ${r.cagr >= 0 ? "pos" : "neg"}">${fmt(r.cagr, 1)}</td>
+      <td class="num ${r.sharpe >= 0 ? "pos" : "neg"}">${fmt(r.sharpe)}</td>
+      <td class="num neg">${fmt(r.max_dd, 1)}</td>
+      <td class="num">${fmt(r.vol, 1)}</td></tr>`;
+  }).join("");
+
+  document.querySelector("#costTable tbody").innerHTML = `
+    <tr><td>Commission</td><td class="num">${(100 * d.costs.commission).toFixed(2)}% / Δpos</td></tr>
+    <tr><td>Slippage</td><td class="num">${(100 * d.costs.slippage).toFixed(2)}% / Δpos</td></tr>
+    <tr><td>Volatility penalty λ</td><td class="num">${d.costs.vol_penalty}</td></tr>
+    <tr><td>Discount γ</td><td class="num">0.60</td></tr>
+    <tr><td>Actions</td><td class="num mono">{-1, 0, +1}</td></tr>`;
+});
+</script>
+{% endblock %}

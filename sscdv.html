@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g4" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">Documents embedded</span><span class="v grad" id="kDocs">—</span><span class="s">regime-aware synthetic corpus</span></div>
+  <div class="card kpi"><span class="k">Vocabulary</span><span class="v" id="kVoc">—</span><span class="s">tf-idf weighted</span></div>
+  <div class="card kpi"><span class="k">PCA variance kept</span><span class="v" id="kVar">—</span><span class="s">160-dim → 50-dim</span></div>
+  <div class="card kpi"><span class="k">Consumed by</span><span class="v" style="font-size:16px;">M4 · M6</span><span class="s">10 PCs in DRL state</span></div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <h3>SSCDV construction <span class="tag">Ueda et al. joint embedding</span></h3>
+  <div class="formula">SSCDV<sub>doc</sub> = Σ<sub>w</sub> tfidf(d,w) · sent(w) · [ topic(w) ⊗ emb(w) ]  →  PCA(50)</div>
+  <div class="note">Each document becomes a topic⊗sentiment-weighted sum of word embeddings; the daily market embedding is the mean over that day's documents. Swap <span class="mono">generate_corpus()</span> for NewsAPI output in production — the formula is identical.</div>
+</div>
+
+<div class="grid g2" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Daily market sentiment</h3>
+    <div class="chart-wrap"><canvas id="sent"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>Topic totals (document count)</h3>
+    <div class="chart-wrap"><canvas id="topics"></canvas></div>
+  </div>
+</div>
+
+<div class="grid g-2-1">
+  <div class="card">
+    <h3>Topic mix over time <span class="tag">share of daily coverage</span></h3>
+    <div class="chart-wrap tall"><canvas id="mix"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>News volume</h3>
+    <div class="chart-wrap tall"><canvas id="vol"></canvas></div>
+    <div class="note">Coverage spikes in Bear and High-Vol regimes — attention feeds the SVI channel used by M5's Granger battery.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const d = await moduleData("sscdv");
+  if (!d) { showEmpty("sent"); return; }
+  document.getElementById("kDocs").textContent = d.n_docs.toLocaleString();
+  document.getElementById("kVoc").textContent = d.vocab_size;
+  document.getElementById("kVar").textContent = d.pca_var + "%";
+
+  lineChart("sent", d.sentiment.dates,
+    [{ label: "sentiment", data: d.sentiment.values, color: C.green, fill: true, width: 1.6 }],
+    { plugins: { legend: { display: false } } });
+
+  const tl = Object.keys(d.topic_totals), tv = Object.values(d.topic_totals);
+  barChart("topics", tl, [{ label: "documents", data: tv,
+    color: [C.cyan, C.violet, C.green, C.amber, C.red] }],
+    { indexAxis: "y", plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: "rgba(103,132,187,0.10)" } }, y: { grid: { display: false } } } });
+
+  const tcolors = { "Markets": C.cyan, "Crypto": C.violet, "Green/ESG": C.green, "Macro": C.amber, "Regulation": C.red };
+  const base = d.topic_mix["Markets"].dates;
+  lineChart("mix", base, Object.entries(d.topic_mix).map(([t, s]) =>
+    ({ label: t, data: s.values, color: tcolors[t], fill: true, width: 1.2 })),
+    { scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 9 } },
+                y: { stacked: true, max: 1, grid: { color: "rgba(103,132,187,0.10)" } } } });
+
+  lineChart("vol", d.news_volume.dates,
+    [{ label: "documents/day", data: d.news_volume.values, color: C.blue, fill: true, width: 1.4 }],
+    { plugins: { legend: { display: false } } });
+});
+</script>
+{% endblock %}

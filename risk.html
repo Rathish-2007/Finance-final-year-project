@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g3" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">Hansen sup-Wald F</span><span class="v grad" id="kF">—</span><span class="s" id="kP"></span></div>
+  <div class="card kpi"><span class="k">Estimated threshold γ̂</span><span class="v" id="kThr">—</span><span class="s">dependence level (%) — true DGP: 12.0</span></div>
+  <div class="card kpi"><span class="k">Stablecoin system TCI</span><span class="v" id="kSc">—</span><span class="s">run-risk VAR spillover</span></div>
+</div>
+
+<div class="grid g2" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Hansen (2000) threshold test <span class="tag">Lo 2022 · Russian commodity dependence</span></h3>
+    <div class="formula">y = μ + b·SPX + β₁·dep·1(dep ≤ γ) + β₂·dep·1(dep > γ) + ε</div>
+    <p class="note" style="margin-bottom:12px;">sup-Wald statistic over a quantile grid of the threshold variable with a Rademacher wild bootstrap (250 replicates). Rejecting H₀ means the commodity complex reacts <b>non-linearly</b> once energy dependence crosses γ̂.</p>
+    <table class="tbl">
+      <thead><tr><th>Quantity</th><th class="num">Value</th></tr></thead>
+      <tbody id="hansenBody"></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Granger feedback battery <span class="tag">Goldstein et al. · attention channel</span></h3>
+    <table class="tbl">
+      <thead><tr><th>Cause → Effect</th><th class="num">Lag</th><th class="num">p-value</th><th>Verdict</th></tr></thead>
+      <tbody id="grangerBody"></tbody>
+    </table>
+    <div class="note">maxlag 5, SSR-F test on standardised series.</div>
+  </div>
+</div>
+
+<div class="grid g-2-1">
+  <div class="card">
+    <h3>Stablecoin run-risk VAR <span class="tag">Joebges et al. · peg deviation ↔ BTC ↔ funding</span></h3>
+    <div class="chart-wrap"><canvas id="scBar"></canvas></div>
+    <div class="note">VAR(2) on [peg deviation, BTC return, funding rate]; generalised FEVD at H=5. High TCI here means a depeg shock propagates — the run-risk channel is live.</div>
+  </div>
+  <div class="card">
+    <h3>FEVD — who drives run risk</h3>
+    <table class="tbl" id="scTable"></table>
+    <div class="divider"></div>
+    <div class="note">Rows = variance of the row variable explained by shocks to the column variable.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const d = await moduleData("risk");
+  if (!d) { showEmpty("hansenBody"); return; }
+  const h = d.hansen, sc = d.stablecoin;
+
+  document.getElementById("kF").textContent = fmt(h.F_stat, 2);
+  document.getElementById("kP").textContent = "p = " + fmt(h.p_value, 4) + (h.significant ? " · significant" : " · not significant");
+  document.getElementById("kThr").textContent = fmt(h.threshold, 2) + "%";
+  document.getElementById("kSc").textContent = fmt(sc.tci, 1) + "%";
+
+  document.getElementById("hansenBody").innerHTML = `
+    <tr><td>sup-F statistic</td><td class="num">${fmt(h.F_stat, 3)}</td></tr>
+    <tr><td>bootstrap p-value (${h.n_boot} reps)</td><td class="num ${h.p_value < 0.1 ? "pos" : ""}">${fmt(h.p_value, 4)}</td></tr>
+    <tr><td>threshold estimate γ̂</td><td class="num">${fmt(h.threshold, 3)}%</td></tr>
+    <tr><td>decision @ 10%</td><td class="num">${h.significant ? '<span class="badge ok">REJECT H₀ — threshold exists</span>' : '<span class="badge muted">fail to reject</span>'}</td></tr>`;
+
+  document.getElementById("grangerBody").innerHTML = d.granger.map(g =>
+    `<tr><td><b>${g.cause}</b> → ${g.effect}</td>
+     <td class="num">${g.lag ?? "—"}</td>
+     <td class="num">${g.p_value == null ? "—" : fmt(g.p_value, 4)}</td>
+     <td>${g.significant ? '<span class="badge ok">FEEDBACK</span>' : '<span class="badge muted">none</span>'}</td></tr>`).join("");
+
+  barChart("scBar", sc.names, [
+    { label: "TO (transmits)", data: sc.to, color: C.red },
+    { label: "FROM (receives)", data: sc.from, color: C.blue },
+    { label: "NET", data: sc.net, color: C.violet },
+  ]);
+
+  let html = "<tr><th></th>" + sc.names.map(n => `<th class="num">${n.split(" ")[0]}</th>`).join("") + "</tr>";
+  sc.fevd.forEach((row, i) => {
+    html += `<tr><td><b>${sc.names[i].split(" ")[0]}</b></td>` + row.map(v =>
+      `<td><div class="heat" style="background:${heatColor(v, 0, 1)}">${fmt(v, 3)}</div></td>`).join("") + "</tr>";
+  });
+  document.getElementById("scTable").innerHTML = html;
+});
+</script>
+{% endblock %}

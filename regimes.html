@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g4" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">Recovery vs ground truth</span><span class="v grad" id="kAcc">—</span><span class="s">smoothed-probability argmax</span></div>
+  <div class="card kpi"><span class="k">Log-likelihood</span><span class="v" id="kLL">—</span><span class="s" id="kBIC"></span></div>
+  <div class="card kpi"><span class="k">Observation</span><span class="v" style="font-size:15px;" id="kObs">—</span><span class="s">multi-start Baum-Welch</span></div>
+  <div class="card kpi"><span class="k">Calibration</span><span class="v" style="font-size:15px;">κ₁=0.99 · λ=0.5 · δ=0.1</span><span class="s">paper parameters</span></div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <h3>Smooth regime probabilities <span class="tag">p_bull · p_bear · p_high — no hard breakpoints</span></h3>
+  <div class="chart-wrap tall"><canvas id="probs"></canvas></div>
+</div>
+
+<div class="grid g-2-1" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Equal-weight traditional portfolio (regime input)</h3>
+    <div class="chart-wrap"><canvas id="port"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>State parameters</h3>
+    <table class="tbl" id="paramTable">
+      <thead><tr><th>State</th><th class="num">dispersion level</th><th class="num">log-σ̂</th><th class="num">σ̂</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="divider"></div>
+    <h3>Transition matrix (daily)</h3>
+    <table class="tbl" id="transTable"></table>
+    <div class="note">States labelled by dispersion order: Bull → Bear → High-Vol/Jump. CJM estimates macro regimes from the traditional-asset portfolio; crypto inherits them through the state space.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const d = await moduleData("regimes");
+  if (!d) { showEmpty("probs"); return; }
+  document.getElementById("kAcc").textContent = d.state_accuracy_vs_truth + "%";
+  document.getElementById("kLL").textContent = d.loglik.toLocaleString();
+  document.getElementById("kBIC").textContent = "BIC " + d.bic.toLocaleString();
+  document.getElementById("kObs").textContent = d.params.observation;
+
+  const dates = d.probs.p_bull.dates;
+  lineChart("probs", dates, [
+    { label: "p_bull", data: d.probs.p_bull.values, color: C.green, width: 1.6 },
+    { label: "p_bear", data: d.probs.p_bear.values, color: C.amber, width: 1.6 },
+    { label: "p_high (jump)", data: d.probs.p_high.values, color: C.red, width: 1.6 },
+  ]);
+
+  lineChart("port", d.port_ret.dates,
+    [{ label: "portfolio return", data: d.port_ret.values, color: C.cyan, width: 1.2 }],
+    { plugins: { legend: { display: false } } });
+
+  document.querySelector("#paramTable tbody").innerHTML = d.labels.map((l, i) =>
+    `<tr><td><span class="badge ${i == 0 ? "ok" : i == 1 ? "warn" : "bad"}">${l}</span></td>
+     <td class="num">${fmt(d.disp_level[i], 5)}</td>
+     <td class="num">${fmt(d.mus[i], 3)}</td>
+     <td class="num">${fmt(d.sigs[i], 3)}</td></tr>`).join("");
+
+  let t = "<tr><th>from \\ to</th>" + d.labels.map(l => `<th class="num">${l.split(" ")[0]}</th>`).join("") + "</tr>";
+  d.A.forEach((row, i) => {
+    t += `<tr><td><b>${d.labels[i].split(" ")[0]}</b></td>` + row.map(v =>
+      `<td class="num"><div class="heat" style="background:${heatColor(v, 0, 1)}">${fmt(v, 3)}</div></td>`).join("") + "</tr>";
+  });
+  document.getElementById("transTable").innerHTML = t;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g4" style="margin-bottom:16px;">
+  <div class="card kpi"><span class="k">TCI τ=0.05 (tail)</span><span class="v neg" id="kT05">—</span><span class="s">crash-quantile spillover</span></div>
+  <div class="card kpi"><span class="k">TCI τ=0.50 (median)</span><span class="v grad" id="kT50">—</span><span class="s">normal-market spillover</span></div>
+  <div class="card kpi"><span class="k">TCI τ=0.95 (boom)</span><span class="v pos" id="kT95">—</span><span class="s">boom-quantile spillover</span></div>
+  <div class="card kpi"><span class="k">Rolling window</span><span class="v" style="font-size:18px;" id="kWin">—</span><span class="s" id="kHor"></span></div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <h3>Total Connectedness Index — time-varying, quantile-conditional <span class="tag">closes G2</span></h3>
+  <div class="chart-wrap tall"><canvas id="tci"></canvas></div>
+  <div class="note">Rolling TVP-VAR(1) → generalised FEVD (Pesaran-Shin, H=10). Quantile-conditional variant re-estimates each equation by IRLS quantile regression and rescales the shock covariance by empirical tail dispersion — regime-aware quantile-frequency connectedness.</div>
+</div>
+
+<div class="grid g2" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Spillover table — latest window <span class="tag" id="tauSel">τ = 0.50</span></h3>
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <button class="btn ghost" onclick="setTau('0.05')">τ=0.05</button>
+      <button class="btn ghost" onclick="setTau('0.5')">τ=0.50</button>
+      <button class="btn ghost" onclick="setTau('0.95')">τ=0.95</button>
+    </div>
+    <div class="chart-wrap"><canvas id="tof"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>NET spillover (transmitted − received)</h3>
+    <div class="chart-wrap"><canvas id="net"></canvas></div>
+  </div>
+</div>
+
+<div class="grid g-2-1">
+  <div class="card">
+    <h3>Pairwise FEVD — net flow network (latest window, τ=0.5)</h3>
+    <div id="netSvg" style="display:flex; justify-content:center;"></div>
+    <div class="note">Arrow width ∝ net pairwise spillover |θ̃<sub>ij</sub> − θ̃<sub>ji</sub>|. Red nodes transmit, blue receive.</div>
+  </div>
+  <div class="card">
+    <h3>Quantile comparison</h3>
+    <table class="tbl" id="qTable">
+      <thead><tr><th>τ</th><th class="num">TCI %</th><th>interpretation</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="divider"></div>
+    <div class="formula">θ̃<sub>ij</sub><sup>g</sup>(H) = σ<sub>jj</sub><sup>-1</sup> Σ<sub>h=0</sub><sup>H-1</sup> (e<sub>i</sub>′A<sup>h</sup>Σe<sub>j</sub>)² / Σ<sub>h=0</sub><sup>H-1</sup> e<sub>i</sub>′A<sup>h</sup>ΣA<sup>h′</sup>e<sub>i</sub></div>
+    <div class="note">Generalised FEVD is ordering-invariant; TCI = 100 × off-diagonal mass / n.</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let DATA = null, CH_TOF = null, CH_NET = null;
+
+function drawTof(tau) {
+  const s = DATA.summary[tau];
+  document.getElementById("tauSel").textContent = "τ = " + tau;
+  if (CH_TOF) CH_TOF.destroy();
+  CH_TOF = barChart("tof", DATA.assets, [
+    { label: "TO (transmits)", data: s.to, color: C.red },
+    { label: "FROM (receives)", data: s.from, color: C.blue },
+  ]);
+  if (CH_NET) CH_NET.destroy();
+  CH_NET = barChart("net", DATA.assets, [{ label: "NET", data: s.net,
+    backgroundColor: s.net.map(v => v >= 0 ? C.red : C.blue) }],
+    { plugins: { legend: { display: false } } });
+}
+function setTau(t) { drawTof(t); }
+
+function drawNetwork(pw, assets) {
+  const n = assets.length, cx = 260, cy = 210, R = 165;
+  const pos = assets.map((a, i) => {
+    const th = -Math.PI / 2 + i * 2 * Math.PI / n;
+    return [cx + R * Math.cos(th), cy + R * Math.sin(th)];
+  });
+  let edges = "";
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    if (i === j) continue;
+    const net = pw[i][j] - pw[j][i];
+    if (net <= 0.004) continue;
+    const w = Math.min(1 + net * 30, 7);
+    edges += `<line x1="${pos[i][0]}" y1="${pos[i][1]}" x2="${pos[j][0]}" y2="${pos[j][1]}"
+      stroke="${net > 0 ? "#fb7185" : "#60a5fa"}" stroke-width="${w}" stroke-opacity="0.45"
+      marker-end="url(#narw)"/>`;
+  }
+  const nets = assets.map((_, i) => pw[i].reduce((a, b) => a + b, 0) - pw.map(r => r[i]).reduce((a, b) => a + b, 0));
+  const nodes = assets.map((a, i) => `
+    <circle cx="${pos[i][0]}" cy="${pos[i][1]}" r="26" fill="#0c1424"
+      stroke="${nets[i] >= 0 ? "#fb7185" : "#60a5fa"}" stroke-width="2.5"/>
+    <text x="${pos[i][0]}" y="${pos[i][1] + 4}" fill="#e6edf7" font-size="10.5" font-weight="700"
+      text-anchor="middle" font-family="Inter, sans-serif">${a}</text>`).join("");
+  document.getElementById("netSvg").innerHTML =
+    `<svg viewBox="0 0 520 420" width="100%" style="max-width:560px;">
+      <defs><marker id="narw" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+      <path d="M0,0 L7,3.5 L0,7 z" fill="#8b9bb8"/></marker></defs>${edges}${nodes}</svg>`;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  DATA = await moduleData("connectedness");
+  if (!DATA) { showEmpty("tci"); return; }
+  const s = DATA.summary;
+  document.getElementById("kT05").textContent = fmt(s["0.05"].tci, 1) + "%";
+  document.getElementById("kT50").textContent = fmt(s["0.5"].tci, 1) + "%";
+  document.getElementById("kT95").textContent = fmt(s["0.95"].tci, 1) + "%";
+  document.getElementById("kWin").textContent = DATA.window + "d / step " + DATA.step;
+  document.getElementById("kHor").textContent = "FEVD horizon H=" + DATA.horizon;
+
+  lineChart("tci", DATA.series["0.5"].dates, [
+    { label: "τ=0.05 (tail)", data: DATA.series["0.05"].tci, color: C.red, width: 1.7 },
+    { label: "τ=0.50 (median)", data: DATA.series["0.5"].tci, color: C.cyan, width: 2.2 },
+    { label: "τ=0.95 (boom)", data: DATA.series["0.95"].tci, color: C.green, width: 1.7 },
+  ]);
+
+  drawTof("0.5");
+  drawNetwork(s["0.5"].pairwise, DATA.assets);
+
+  document.querySelector("#qTable tbody").innerHTML = ["0.05", "0.5", "0.95"].map(t =>
+    `<tr><td><b class="mono">τ=${t}</b></td><td class="num">${fmt(s[t].tci, 1)}%</td>
+     <td class="note" style="margin:0;">${t === "0.05" ? "crash states — how much the system transmits in tails" : t === "0.5" ? "normal conditions" : "boom states"}</td></tr>`).join("");
+});
+</script>
+{% endblock %}

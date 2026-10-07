@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid g-2-1" style="margin-bottom:16px;">
+  <div class="card">
+    <h3>Gap → Module mapping <span class="tag">paper contributions</span></h3>
+    <table class="tbl">
+      <thead><tr><th>Gap</th><th>Deficit in prior literature</th><th>RASTA-QF module</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><b>G1</b></td><td>Siloed assets — no unified cross-class panel</td><td>M1 Data Lake (10 assets, 2016-24)</td><td><span class="badge ok">CLOSED</span></td></tr>
+        <tr><td><b>G2</b></td><td>No regime-aware quantile-frequency connectedness</td><td>M3 CJM probs × M4 QQC (τ-conditional TCI)</td><td><span class="badge ok">CLOSED</span></td></tr>
+        <tr><td><b>G3</b></td><td>No standardised benchmark (Ashtiani 2023)</td><td>M1+M2 pipeline → <span class="mono">RASTA_QF_Benchmark.h5</span></td><td><span class="badge ok">CLOSED</span></td></tr>
+        <tr><td><b>G4</b></td><td>Black-box DRL, unrealistic frictions</td><td>M6 hierarchical MADQN + costs + SHAP</td><td><span class="badge ok">CLOSED</span></td></tr>
+        <tr><td><b>G5</b></td><td>Thresholds, feedback loops &amp; stability untested</td><td>M5 Hansen · Granger · run-risk VAR</td><td><span class="badge ok">CLOSED</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Benchmark export</h3>
+    <p class="note" style="margin-bottom:14px;">The full harmonised panel — prices, returns, auxiliary series (SVI, peg deviation, funding, dependence, FinTech/bank stability) — packaged for replication.</p>
+    <a class="btn primary" href="/api/benchmark/download">⬇&nbsp; Download RASTA_QF_Benchmark.h5</a>
+    <div class="note" style="margin-top:12px;">Deterministic synthetic benchmark (seed 42). Swap in live data via the yfinance adapter in <span class="mono">core/services/data_lake.py</span>.</div>
+    <div class="divider"></div>
+    <h3>Key hyperparameters</h3>
+    <table class="tbl"><tbody>
+      <tr><td>κ₁ (persistence)</td><td class="num">0.99</td></tr>
+      <tr><td>λ (jump penalty)</td><td class="num">0.5</td></tr>
+      <tr><td>δ (jump size)</td><td class="num">0.1</td></tr>
+      <tr><td>VAR lag (BIC)</td><td class="num">1</td></tr>
+      <tr><td>FEVD horizon</td><td class="num">10</td></tr>
+      <tr><td>Quantiles τ</td><td class="num">.05 / .50 / .95</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <h3>12-week execution plan</h3>
+    <table class="tbl">
+      <thead><tr><th>Weeks</th><th>Workstream</th><th>Artefact</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1-2</td><td>Data collection — yfinance · pytrends · NewsAPI</td><td>raw lake</td></tr>
+        <tr><td class="mono">3</td><td>SSCDV construction + PCA-50</td><td>embedding panel</td></tr>
+        <tr><td class="mono">4</td><td>CJM fit (jumpmodels API-compatible)</td><td>regime probs</td></tr>
+        <tr><td class="mono">5-6</td><td>TVP-VAR + QQC at τ ∈ {.05, .5, .95}</td><td>TCI · TO/FROM/NET</td></tr>
+        <tr><td class="mono">7</td><td>Hansen threshold + crypto VAR</td><td>risk evidence</td></tr>
+        <tr><td class="mono">8-10</td><td>Hierarchical MADQN — pre-train 16-20, fine-tune 21-24</td><td>trained agents</td></tr>
+        <tr><td class="mono">11</td><td>Evaluation vs single-agent DQN &amp; SCDV baselines</td><td>results tables</td></tr>
+        <tr><td class="mono">12</td><td>Benchmark release + paper assembly</td><td>submission</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Expected evidence (this run)</h3>
+    <div id="evidence"><div class="empty"><div class="big">◇</div>Run the pipeline to populate.</div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const bits = [];
+  const r = await moduleData("regimes");
+  if (r) bits.push(["Regime recovery vs synthetic truth", r.state_accuracy_vs_truth + "%"]);
+  const c = await moduleData("connectedness");
+  if (c) {
+    bits.push(["TCI τ=0.05 vs τ=0.95 (latest)",
+      fmt(c.summary["0.05"].tci, 1) + "% vs " + fmt(c.summary["0.95"].tci, 1) + "%"]);
+  }
+  const k = await moduleData("risk");
+  if (k) {
+    bits.push(["Hansen sup-F (p)", fmt(k.hansen.F_stat, 2) + " (" + fmt(k.hansen.p_value, 3) + ")"]);
+    bits.push(["Threshold γ̂ vs true 12.0", fmt(k.hansen.threshold, 2) + "%"]);
+    bits.push(["Stablecoin run-risk TCI", fmt(k.stablecoin.tci, 1) + "%"]);
+  }
+  const d = await moduleData("drl");
+  if (d) {
+    const h = d.metrics["RASTA-QF Hierarchical"], s = d.metrics["Single-agent DQN (regime-blind)"];
+    bits.push(["OOS Sharpe: hierarchical vs regime-blind", fmt(h.sharpe) + " vs " + fmt(s.sharpe)]);
+    bits.push(["OOS max-DD improvement", fmt(h.max_dd, 1) + "% vs " + fmt(d.metrics["Buy & Hold Benchmark"].max_dd, 1) + "%"]);
+    bits.push(["Top explainability group",
+      Object.entries(d.explainability).sort((a, b) => b[1] - a[1])[0][0]]);
+  }
+  if (bits.length) {
+    document.getElementById("evidence").innerHTML =
+      `<table class="tbl"><tbody>${bits.map(b =>
+        `<tr><td>${b[0]}</td><td class="num"><b>${b[1]}</b></td></tr>`).join("")}</tbody></table>`;
+  }
+});
+</script>
+{% endblock %}
