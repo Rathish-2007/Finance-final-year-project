@@ -5,14 +5,33 @@
 One technique that closes all five literature gaps (G1–G5), implemented as a complete
 Django application with a dark quant-terminal UI.
 
+### Run it like a normal website (production)
+
 ```
-pip install django numpy pandas scipy scikit-learn statsmodels h5py
-python manage.py migrate
-python manage.py run_pipeline          # optional: pre-compute everything headlessly
-python manage.py runserver 0.0.0.0:8000
+./start.sh                 # one command: deps → migrate → collectstatic → gunicorn :8000
 ```
 
-Open http://localhost:8000 — or click **▶ Run Full Pipeline** in the UI (≈60 s).
+That's it. `start.sh` self-heals: it installs any missing dependency from
+`requirements.txt`, applies migrations, collects static assets through
+WhiteNoise, and boots **Gunicorn** (2 workers × 4 threads) on
+`http://0.0.0.0:8000`. Options:
+
+```
+PORT=9000 ./start.sh       # custom port
+DEBUG=1   ./start.sh       # Django dev server instead of gunicorn
+```
+
+Open the URL and click **▶ Run Full Pipeline** in the UI (≈60 s), or open a
+page that already has computed evidence — results persist in SQLite.
+
+### Manual / development
+
+```
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py run_pipeline          # optional: pre-compute headlessly
+python manage.py runserver 0.0.0.0:8000
+```
 
 ---
 
@@ -53,9 +72,27 @@ direct evidence the agent trades the CJM probabilities.
 
 ## Pages
 
-`/` mission control · `/data` M1 · `/sscdv` M2 · `/regimes` M3 ·
-`/connectedness` M4 · `/risk` M5 · `/drl` M6 · `/benchmark` gap→module
-mapping, 12-week plan, benchmark download.
+| Route | Page |
+|---|---|
+| `/` | **Live Monitor** — 8-tab dashboard (Overview · Connectedness · Regime Tracker · Sentiment Lab · Threshold & Stability · Portfolio Simulator · **Backtesting Studio** · Roadmap & API), every figure fed by `/api/results/*` |
+| ↳ Backtesting Studio | RASTA-QF DRL vs regime-blind DQN vs Markowitz max-Sharpe vs Buy & Hold, with a 0–60 bps **friction slider** that re-prices the stored trade paths live (decomposition: `gross`, `turnover`, `volpen` in `drl.backtest`) |
+| `/console` | Mission control — pipeline runner, status dots, execution console |
+| `/data` · `/sscdv` · `/regimes` · `/connectedness` · `/risk` · `/drl` | Modules M1–M6 |
+| `/benchmark` | Gap→module mapping, 12-week plan, `RASTA_QF_Benchmark.h5` download |
+| `/docs` | **Methodology paper** — full academic write-up with live numbers |
+| `/report` | **Live research report** — every figure rendered from computed results |
+| `/blog` | **Weekly Regime Log** — narrative auto-composed from the latest results + transition table |
+| `/apidocs` | **API Reference** — endpoints, examples, response schemas |
+| `/health` | JSON liveness probe (`status`, modules done) |
+
+The Live Monitor reads the same stored JSON the module pages use; the Portfolio
+Simulator computes portfolio return/vol/Sharpe from the **regime-conditional mean
+vector and covariance of actual daily returns** per CJM state (top-level result of
+the regimes module: `regime_stats`), and the Threshold tab plots the real
+dependence→impact scatter with the Hansen breakpoint (`risk.dep_curve`).
+
+Production serving: Gunicorn + WhiteNoise (compressed, manifest-hashed static
+files), `DEBUG=0`, custom branded 404/500 pages.
 
 ## Notes
 

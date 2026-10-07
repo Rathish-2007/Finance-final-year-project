@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RASTA-QF · Live Research Dashboard (Prototype)</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#121c2e; --panel2:#0f1827; --line:rgba(255,255,255,.08);
+    --txt:#e6edf7; --mut:#8fa3bf; --acc:#4ea1ff; --grn:#35d0a5; --red:#ff6e6e;
+    --amb:#ffc857; --vio:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{padding:18px 22px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0e1626,#0b1220)}
+  .brand{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#4ea1ff,#35d0a5);display:flex;align-items:center;justify-content:center;font-weight:800;color:#07101f;font-size:15px}
+  h1{font-size:19px;letter-spacing:.2px}
+  .sub{color:var(--mut);font-size:12.5px;margin-top:2px}
+  .badge{margin-left:auto;font-size:11px;color:#ffd98a;border:1px solid rgba(255,200,87,.35);background:rgba(255,200,87,.08);padding:4px 10px;border-radius:999px}
+  nav{display:flex;gap:6px;flex-wrap:wrap;padding:10px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,18,32,.95);backdrop-filter:blur(6px);z-index:20}
+  nav button{background:transparent;border:1px solid transparent;color:var(--mut);padding:7px 13px;border-radius:8px;cursor:pointer;font-size:13px}
+  nav button:hover{color:var(--txt);background:rgba(255,255,255,.04)}
+  nav button.on{color:#0b1220;background:linear-gradient(135deg,#4ea1ff,#35d0a5);font-weight:700}
+  main{padding:20px 22px 60px;max-width:1240px;margin:0 auto}
+  section.tab{display:none}
+  section.tab.on{display:block}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:980px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}
+  @media(max-width:640px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card h3{font-size:13px;color:var(--mut);font-weight:600;letter-spacing:.4px;text-transform:uppercase;margin-bottom:10px}
+  .kpi{font-size:26px;font-weight:800}
+  .kpi small{font-size:12px;color:var(--mut);font-weight:400;margin-left:6px}
+  .up{color:var(--grn)} .down{color:var(--red)} .warn{color:var(--amb)}
+  .muted{color:var(--mut)}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11.5px;border:1px solid var(--line)}
+  .pill.bear{background:rgba(255,110,110,.12);color:#ff9d9d;border-color:rgba(255,110,110,.3)}
+  .pill.bull{background:rgba(53,208,165,.12);color:#7ce7c6;border-color:rgba(53,208,165,.3)}
+  .pill.hv{background:rgba(255,200,87,.12);color:#ffd98a;border-color:rgba(255,200,87,.3)}
+  canvas{display:block;width:100%}
+  .hm{display:grid;gap:2px;font-size:11px;align-items:center}
+  .hm .lbl{color:var(--mut);padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cell{border-radius:4px;text-align:center;padding:5px 2px;color:#eaf1fb;font-variant-numeric:tabular-nums}
+  .alerts{list-style:none}
+  .alerts li{padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .alerts li:last-child{border-bottom:none}
+  .alerts .t{color:var(--mut);font-size:11.5px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600}
+  .row{display:flex;align-items:center;gap:10px;margin:6px 0}
+  .row .nm{width:150px;font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row input[type=range]{flex:1;accent-color:#4ea1ff}
+  .row .val{width:38px;text-align:right;font-size:12px;color:var(--txt);font-variant-numeric:tabular-nums}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{background:transparent;border:none;color:var(--mut);padding:6px 14px;cursor:pointer;font-size:12.5px}
+  .seg button.on{background:rgba(78,161,255,.18);color:#cfe4ff;font-weight:700}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .note{font-size:12px;color:var(--mut);margin-top:10px;border-left:2px solid rgba(78,161,255,.5);padding-left:10px}
+  .cards4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:780px){.cards4{grid-template-columns:1fr 1fr}}
+  .mini{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .mini .v{font-size:21px;font-weight:800}
+  .mini .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .feat{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .feat:last-child{border-bottom:none}
+  .feat .ic{font-size:16px}
+  .feat b{display:block;font-size:13px}
+  .feat span{font-size:12.2px;color:var(--mut)}
+  code{background:rgba(255,255,255,.06);padding:1.5px 6px;border-radius:5px;font-size:12px}
+  pre{background:#0a0f1b;border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;font-size:12px;color:#c9d7ec}
+  footer{border-top:1px solid var(--line);padding:16px 22px;color:var(--mut);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">R-QF</div>
+    <div>
+      <h1>RASTA-QF · Regime-Aware Sentiment-Threshold Adaptive Quantile-Frequency Platform</h1>
+      <div class="sub">Unified connectedness & trading intelligence across green bonds, equities, commodities and crypto · 2016–2024</div>
+    </div>
+    <div class="badge">Prototype · simulated data</div>
+  </div>
+</header>
+
+<nav id="nav">
+  <button data-tab="overview" class="on">Overview</button>
+  <button data-tab="conn">Connectedness</button>
+  <button data-tab="regime">Regime Tracker</button>
+  <button data-tab="sent">Sentiment Lab</button>
+  <button data-tab="thr">Threshold &amp; Stability</button>
+  <button data-tab="sim">Portfolio Simulator</button>
+  <button data-tab="road">Roadmap &amp; API</button>
+</nav>
+
+<main>
+
+<!-- ================= OVERVIEW ================= -->
+<section class="tab on" id="tab-overview">
+  <div class="cards4">
+    <div class="mini"><div class="k">Total Connectedness Index</div><div class="v" id="k-tci">–</div><div class="muted" id="k-tcid">–</div></div>
+    <div class="mini"><div class="k">Current Regime</div><div class="v" id="k-reg">–</div><div class="muted" id="k-regd">–</div></div>
+    <div class="mini"><div class="k">SSCDV Sentiment Index</div><div class="v" id="k-sent">–</div><div class="muted" id="k-sentd">–</div></div>
+    <div class="mini"><div class="k">Top Net Transmitter</div><div class="v" id="k-tx">–</div><div class="muted" id="k-txd">–</div></div>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Dynamic Total Connectedness (TCI) — full sample</h3><canvas id="cv-ov-tci" data-h="230"></canvas>
+      <div class="legend"><span><span class="dot" style="background:rgba(255,110,110,.5)"></span>COVID-19</span><span><span class="dot" style="background:rgba(255,200,87,.5)"></span>Russo-Ukrainian War</span><span><span class="dot" style="background:rgba(167,139,250,.5)"></span>2023 Banking stress</span></div>
+    </div>
+    <div class="card"><h3>Regime probabilities (Continuous Jump Model)</h3><canvas id="cv-ov-reg" data-h="230"></canvas>
+      <div class="legend"><span><span class="dot" style="background:#35d0a5"></span>Bull / calm</span><span><span class="dot" style="background:#ff6e6e"></span>Bear</span><span><span class="dot" style="background:#ffc857"></span>High-volatility</span></div>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Live signal feed (last 8 sessions)</h3>
+      <ul class="alerts" id="feed"></ul>
+    </div>
+    <div class="card"><h3>How the 5 research gaps map to this platform</h3>
+      <div class="feat"><span class="ic">🧩</span><div><b>G1 · Siloed assets</b><span>Single data lake: 10 assets incl. green bond, crypto, commodities, equities, clean energy.</span></div></div>
+      <div class="feat"><span class="ic">🧠</span><div><b>G2 · No regime-aware quantile-frequency model</b><span>CJM regimes → TVP-VAR frequency + quantile-on-quantile connectedness conditioned on state.</span></div></div>
+      <div class="feat"><span class="ic">📦</span><div><b>G3 · No benchmark dataset</b><span>Versioned, DOI'd benchmark with data card, downloadable from this site.</span></div></div>
+      <div class="feat"><span class="ic">🤖</span><div><b>G4 · Black-box AI, no frictions</b><span>Explainable hierarchical multi-agent DRL with transaction costs, slippage + SHAP.</span></div></div>
+      <div class="feat"><span class="ic">⚖️</span><div><b>G5 · Thresholds / feedback / run-risk ignored</b><span>Breakpoint regression, feedback-effect tester, stablecoin run-risk monitor.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONNECTEDNESS ================= -->
+<section class="tab" id="tab-conn">
+  <div class="grid g2">
+    <div class="card"><h3>TCI with event shading</h3><canvas id="cv-c-tci" data-h="260"></canvas>
+      <div class="note">Spikes verify the COVID and war literature (Umar 2022, Adekoya 2021) reproduced inside a unified 10-asset system.</div>
+    </div>
+    <div class="card"><h3>Conditional TCI by regime</h3><canvas id="cv-c-bar" data-h="260"></canvas>
+      <div class="note">Connectedness roughly doubles in bear/high-vol states vs calm states — the state-conditioning that prior single-sample studies miss.</div>
+    </div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Net spillover by asset × regime (+, transmitter / −, receiver)</h3>
+      <div id="hm-net" class="hm"></div>
+      <div class="note">Green bonds and gold flip to net receivers in stress — conditional safe-haven evidence; BTC/ETH remain net transmitters in every state.</div>
+    </div>
+    <div class="card"><h3>Pairwise drill-down: quantile dependence</h3>
+      <div class="seg" id="pairseg">
+        <button data-p="GB|BTC" class="on">Green Bond ↔ BTC</button>
+        <button data-p="GB|GOLD">Green Bond ↔ Gold</button>
+        <button data-p="GB|SPX">Green Bond ↔ S&amp;P 500</button>
+      </div>
+      <canvas id="cv-c-pair" data-h="240" style="margin-top:10px"></canvas>
+      <div class="note" id="pairnote"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= REGIME ================= -->
+<section class="tab" id="tab-regime">
+  <div class="grid g2">
+    <div class="card"><h3>Regime probability bands (stacked)</h3><canvas id="cv-r-area" data-h="280"></canvas></div>
+    <div class="card"><h3>Today's nowcast</h3>
+      <canvas id="cv-r-now" data-h="120"></canvas>
+      <div id="r-note" class="note"></div>
+      <h3 style="margin-top:16px">Transition matrix (5-day)</h3>
+      <div id="hm-trans" class="hm"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Regime calendar (monthly dominant state)</h3>
+    <div id="hm-cal" class="hm"></div>
+    <div class="legend"><span><span class="dot" style="background:#35d0a5"></span>Bull</span><span><span class="dot" style="background:#ff6e6e"></span>Bear</span><span><span class="dot" style="background:#ffc857"></span>High-vol</span></div>
+  </div>
+</section>
+
+<!-- ================= SENTIMENT ================= -->
+<section class="tab" id="tab-sent">
+  <div class="grid g2">
+    <div class="card"><h3>SSCDV topic × sentiment intensity</h3><div id="hm-sent" class="hm"></div>
+      <div class="note">Joint topic–sentiment pairs (FinBERT + BERTopic) as in the Ueda (2024) extension — but computed for all 10 assets, not one index.</div>
+    </div>
+    <div class="card"><h3>Sentiment index over time</h3><canvas id="cv-s-line" data-h="270"></canvas>
+      <div class="note">Sentiment collapses before/with volatility spikes → feature for the regime model and the DRL state vector.</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Top topic–sentiment drivers (SHAP-style contribution to High-Vol regime)</h3>
+    <table id="t-shap"><thead><tr><th>Rank</th><th>Topic–sentiment pair</th><th>Direction</th><th>Contribution</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- ================= THRESHOLD ================= -->
+<section class="tab" id="tab-thr">
+  <div class="grid g2">
+    <div class="card"><h3>Dependence threshold: commodity dependence → volatility impact</h3><canvas id="cv-t-sc" data-h="280"></canvas>
+      <div class="note">Breakpoint near 20% dependence (cf. Lo et al. 2022). Beyond it, marginal volatility impact rises ~13×.</div>
+    </div>
+    <div class="card"><h3>Stablecoin run-risk monitor (crypto ↔ TradFi)</h3>
+      <canvas id="cv-t-cr" data-h="180"></canvas>
+      <div class="cards4" style="margin-top:12px">
+        <div class="mini"><div class="k">Stablecoin mcap share</div><div class="v" id="c-share">–</div></div>
+        <div class="mini"><div class="k">Corr(Δstable, Δcrypto)</div><div class="v" id="c-corr">–</div></div>
+        <div class="mini"><div class="k">Redemption pressure</div><div class="v" id="c-red">–</div></div>
+        <div class="mini"><div class="k">TradFi spillover β</div><div class="v" id="c-beta">–</div></div>
+      </div>
+      <div class="note">Framework after Joebges (2025): reserve fire-sales channel. Proxies shown for illustration.</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Feedback-effect tester (Goldstein, 2023)</h3>
+    <div class="grid g3">
+      <div class="mini"><div class="k">Price informativeness (1−R²)</div><div class="v">0.41</div><div class="muted">market-model residual share</div></div>
+      <div class="mini"><div class="k">Granger → CAPEX</div><div class="v up">p = 0.03</div><div class="muted">informativeness leads investment</div></div>
+      <div class="mini"><div class="k">FinTech shock interaction</div><div class="v warn">+0.12**</div><div class="muted">high-info days amplify feedback</div></div>
+    </div>
+    <div class="note">Tests whether market-produced information guides real decisions, and whether SSCDV-information-intensity days strengthen the channel.</div>
+  </div>
+</section>
+
+<!-- ================= SIMULATOR ================= -->
+<section class="tab" id="tab-sim">
+  <div class="grid g2">
+    <div class="card"><h3>Allocation (drag the sliders)</h3>
+      <div id="sliders"></div>
+      <div style="margin-top:12px" class="seg" id="regseg">
+        <button data-r="bull" class="on">Bull regime</button>
+        <button data-r="bear">Bear regime</button>
+        <button data-r="highvol">High-vol regime</button>
+      </div>
+      <div class="note">Expected stats blend the 10-asset factor covariance with regime multipliers from the CJM. Illustrative only — not investment advice.</div>
+    </div>
+    <div class="card"><h3>Conditional portfolio analytics</h3>
+      <canvas id="cv-sim-donut" data-h="200"></canvas>
+      <div class="cards4" style="margin-top:10px">
+        <div class="mini"><div class="k">Ann. return</div><div class="v" id="s-ret">–</div></div>
+        <div class="mini"><div class="k">Ann. vol</div><div class="v" id="s-vol">–</div></div>
+        <div class="mini"><div class="k">Sharpe</div><div class="v" id="s-shp">–</div></div>
+        <div class="mini"><div class="k">Est. max DD</div><div class="v" id="s-dd">–</div></div>
+      </div>
+      <div class="legend" id="s-extra" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Regime-conditional comparison (current allocation)</h3><canvas id="cv-sim-bars" data-h="220"></canvas></div>
+</section>
+
+<!-- ================= ROADMAP ================= -->
+<section class="tab" id="tab-road">
+  <div class="grid g2">
+    <div class="card"><h3>What more can be done — feature tiers</h3>
+      <div class="feat"><span class="ic">📈</span><div><b>Tier 1 · Research dashboard (MVP)</b><span>Live TCI, regime nowcast, sentiment lab, benchmark download, weekly auto-report. Ships on Streamlit + Hugging Face Spaces — free.</span></div></div>
+      <div class="feat"><span class="ic">🧪</span><div><b>Tier 2 · Analytics platform</b><span>Upload-your-own-data pipeline, backtesting studio, custom alerts (email/Telegram/Slack), saved watchlists, API keys, PDF reports.</span></div></div>
+      <div class="feat"><span class="ic">🏛️</span><div><b>Tier 3 · Institution features</b><span>White-label dashboards, Regime-as-a-Service feed, websocket streaming, SSO, SLA, compliance exports.</span></div></div>
+      <div class="feat"><span class="ic">🎓</span><div><b>Community</b><span>Paper-replication hub (Binder) for all 15 source papers, method leaderboard on the benchmark, course mode for universities.</span></div></div>
+      <div class="feat"><span class="ic">🇮🇳</span><div><b>India module</b><span>NSE Nifty, sovereign green bonds, MCX Gold, BTC‑INR, USDINR — unique local angle for your Chennai base.</span></div></div>
+      <div class="feat"><span class="ic">🤝</span><div><b>AI layer</b><span>LLM daily narrative report, RAG chatbot over the dataset ("why was 2022‑03‑10 high-vol?"), auto figure generation.</span></div></div>
+    </div>
+    <div class="card"><h3>Architecture &amp; stack</h3>
+<pre>Frontend  Next.js + Tailwind + ECharts
+API       FastAPI (REST + WebSocket)
+Workers   Prefect/Celery (nightly pipeline)
+DB        PostgreSQL + TimescaleDB
+Files     S3/R2 (benchmark .h5/.parquet)
+ML        ONNX Runtime (CJM, DRL agent)
+Auth      Supabase  ·  Billing Razorpay+Stripe
+Host      Fly.io / Render / Hetzner
+MVP path  Streamlit + HF Spaces (free)</pre>
+      <div class="note">Nightly pipeline: fetch → GARCH norm → SSCDV → CJM → TVP‑VAR/QQC → SHAP → publish JSON → alerts.</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>API sketch</h3>
+<pre>GET /v1/tci?start=&amp;end=&amp;freq=short|long
+GET /v1/regime/current        → {p_bull, p_bear, p_high, since}
+GET /v1/connectedness/net?regime=bear&amp;quantile=0.05
+GET /v1/sentiment/sscdv?date=2022-03-01
+GET /v1/threshold/breakpoints
+POST /v1/portfolio/optimize   → {assets, constraints, regime}
+GET /v1/benchmark/download    → RASTA_QF_Benchmark.h5
+WS  /v1/stream                → live regime + TCI (Pro)</pre>
+    </div>
+  <div class="cards4" style="margin-top:14px">
+    <div class="mini"><div class="k">Weeks 1–2</div><div class="v" style="font-size:14px">Data lake + Streamlit skeleton</div></div>
+    <div class="mini"><div class="k">Weeks 3–6</div><div class="v" style="font-size:14px">SSCDV + CJM + TVP‑VAR pages live</div></div>
+    <div class="mini"><div class="k">Weeks 7–10</div><div class="v" style="font-size:14px">DRL + backtesting + simulator</div></div>
+    <div class="mini"><div class="k">Weeks 11–12</div><div class="v" style="font-size:14px">Alerts, API, DOI benchmark, launch</div></div>
+  </div>
+</section>
+
+</main>
+<footer>RASTA-QF prototype · figures use simulated data for layout purposes · replace <code>DATA</code> with live API calls in production</footer>
+
+<script>
+/* ============================================================
+   RASTA-QF PROTOTYPE  —  simulated data, zero dependencies
+   Replace the DATA block with fetch('/api/v1/...') in production
+   ============================================================ */
+
+/* ---------- seeded RNG ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=mulberry32(20220224);
+function gauss(){let u=0,v=0;while(u===0)u=R();while(v===0)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+
+/* ---------- business-day calendar ---------- */
+const dates=[];{let d=new Date(2016,0,4);const end=new Date(2024,11,31);while(d<=end){const w=d.getDay();if(w!==0&&w!==6)dates.push(new Date(d));d.setDate(d.getDate()+1)}}
+const N=dates.length;
+function idxOf(str){const t=new Date(str).getTime();let best=0,bd=1e18;for(let i=0;i<N;i++){const dd=Math.abs(dates[i].getTime()-t);if(dd<bd){bd=dd;best=i}}return best}
+const fmtDate=i=>dates[i].toISOString().slice(0,10);
+const bump=(i,c,s)=>Math.exp(-((i-c)*(i-c))/(2*s*s));
+
+/* ---------- event bands ---------- */
+const BANDS=[
+ {a:idxOf('2020-02-20'),b:idxOf('2020-05-20'),c:'rgba(255,110,110,.10)',l:'COVID-19'},
+ {a:idxOf('2022-02-24'),b:idxOf('2022-07-01'),c:'rgba(255,200,87,.10)',l:'Russo-Ukrainian War'},
+ {a:idxOf('2023-03-08'),b:idxOf('2023-05-05'),c:'rgba(167,139,250,.10)',l:'Banking stress'}
+];
+
+/* ---------- series ---------- */
+const TCI=new Array(N),SENT=new Array(N),pBull=new Array(N),pBear=new Array(N),pHigh=new Array(N);
+{
+  const cv=idxOf('2020-04-05'),wv=idxOf('2022-03-12'),bk=idxOf('2023-03-20');
+  const vm=idxOf('2018-02-05'),q4=idxOf('2018-12-20');
+  for(let i=0;i<N;i++){
+    let t=42+5*Math.sin(i/95)+2.5*Math.sin(i/13)+gauss()*2.2;
+    t+=46*bump(i,cv,24)+33*bump(i,wv,32)+19*bump(i,bk,13)+12*bump(i,vm,9)+9*bump(i,q4,16);
+    TCI[i]=clamp(t,26,93);
+
+    const zh=(TCI[i]-46)/17+gauss()*.30, zb=(TCI[i]-49)/21+gauss()*.30, zl=-(TCI[i]-45)/13+gauss()*.25;
+    const eH=Math.exp(zh/.8),eB=Math.exp(zb/.8),eL=Math.exp(zl/.8),S=eH+eB+eL;
+    pHigh[i]=eH/S; pBear[i]=eB/S; pBull[i]=eL/S;
+
+    let s=.18-.52*bump(i,cv,26)-.72*bump(i,wv,36)-.34*bump(i,bk,15)+.06*bump(i,vm,8)+.22*Math.sin(i/72)+gauss()*.12;
+    SENT[i]=clamp(s,-1,1);
+  }
+}
+
+/* ---------- assets ---------- */
+const ASSETS=[
+ {id:'GB', name:'S&P Green Bond', color:'#35d0a5'},
+ {id:'SPX', name:'S&P 500', color:'#4ea1ff'},
+ {id:'DAX', name:'DAX 40', color:'#7f9cf5'},
+ {id:'SSE', name:'Shanghai Comp.', color:'#9f7aea'},
+ {id:'GOLD', name:'Gold', color:'#ffc857'},
+ {id:'BRENT', name:'Brent Crude', color:'#ff8f5e'},
+ {id:'GSCI', name:'S&P GSCI', color:'#f28b82'},
+ {id:'BTC', name:'Bitcoin', color:'#f7931a'},
+ {id:'ETH', name:'Ethereum', color:'#a78bfa'},
+ {id:'CE', name:'Clean Energy', color:'#4ade80'}
+];
+/* net spillover (+ transmitter / − receiver) by regime */
+const NET={
+ bull:   [ 3, 12,  8,  4, -8,  6,  5, 21, 18,  9],
+ bear:   [-6,-22,-14,-10,-15,  8,  6, 19, 16, -4],
+ highvol:[-11,-18,-12, -7,-21, 12, 10, 26, 22, -8]
+};
+const REGNAMES=['Bull','Bear','High-vol'];
+const REGCOLORS=['#35d0a5','#ff6e6e','#ffc857'];
+
+/* ---------- canvas helpers ---------- */
+function setup(cv,h){
+  const dpr=window.devicePixelRatio||1, w=cv.parentElement.clientWidth-32;
+  const hh=h||+cv.dataset.h||220;
+  if(w<=0) return null;
+  cv.width=w*dpr; cv.height=hh*dpr; cv.style.height=hh+'px'; cv.style.width='100%';
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,hh);
+  return {ctx,w,h:hh};
+}
+function drawLine(cv,series,opts){
+  const o=opts||{}, S=setup(cv,o.h); if(!S) return;
+  const {ctx,w,h}=S, padL=o.padL!==undefined?o.padL:44, padR=12, padT=10, padB=22;
+  let all=[]; series.forEach(s=>all=all.concat(s));
+  let mn=o.yMin!==undefined?o.yMin:Math.min.apply(null,all), mx=o.yMax!==undefined?o.yMax:Math.max.apply(null,all);
+  const pd=(mx-mn)*.08||1; mn-=pd; mx+=pd;
+  const X=i=>padL+(w-padL-padR)*i/(series[0].length-1);
+  const Y=v=>padT+(h-padT-padB)*(1-(v-mn)/(mx-mn));
+  if(o.bands) o.bands.forEach(b=>{ctx.fillStyle=b.c;ctx.fillRect(X(b.a),padT,Math.max(1,X(b.b)-X(b.a)),h-padT-padB);});
+  if(!o.mini){
+    ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#8fa3bf';ctx.font='10px sans-serif';
+    for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.fillText((Math.abs(v)>=100?v.toFixed(0):v.toFixed(v>10?1:2)),6,y+3);}
+    if(o.xLabels){
+      o.xLabels.forEach((lab,gi)=>{ctx.fillText(lab,X(gi)-8,h-7);});
+    }else{
+      for(let y9=2016;y9<=2024;y9++){const i=idxOf(y9+'-01-15');if(i>0&&i<series[0].length)ctx.fillText(String(y9),X(i)-10,h-7);}
+    }
+  }
+  series.forEach((s,si)=>{
+    ctx.strokeStyle=(o.colors&&o.colors[si])||'#4ea1ff'; ctx.lineWidth=o.lw||1.5; ctx.beginPath();
+    for(let i=0;i<s.length;i++){const x=X(i),y=Y(s[i]); i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke();
+    if(o.fills&&o.fills[si]){ctx.fillStyle=o.fills[si];ctx.lineTo(X(s.length-1),Y(mn));ctx.lineTo(X(0),Y(mn));ctx.closePath();ctx.fill();}
+  });
+  if(o.hline!==undefined){const y=Y(o.hline);ctx.setLineDash([5,4]);ctx.strokeStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.setLineDash([]);}
+}
+function drawStack(cv,S3,colors,title){
+  const o={h:+cv.dataset.h||270},S=setup(cv,o.h); if(!S) return;
+  const {ctx,w,h}=S, padL=44,padR=12,padT=10,padB=22;
+  const n=S3[0].length, X=i=>padL+(w-padL-padR)*i/(n-1), Y=v=>padT+(h-padT-padB)*(1-v);
+  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#8fa3bf';ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const y=Y(g/4);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.fillText((g/4).toFixed(2),6,y+3);}
+  for(let y9=2016;y9<=2024;y9++){const i=idxOf(y9+'-01-15');if(i>0&&i<n)ctx.fillText(String(y9),X(i)-10,h-7);}
+  const cum=new Array(n).fill(0);
+  S3.forEach((s,si)=>{
+    ctx.fillStyle=colors[si];ctx.beginPath();
+    for(let i=0;i<n;i++){const y=Y(cum[i]+s[i]);i?ctx.lineTo(X(i),y):ctx.moveTo(X(i),y);}
+    for(let i=n-1;i>=0;i--){ctx.lineTo(X(i),Y(cum[i]));}
+    ctx.closePath();ctx.fill();
+    for(let i=0;i<n;i++)cum[i]+=s[i];
+  });
+}
+function drawBars(cv,labels,values,colors,opts){
+  const o=opts||{},S=setup(cv,o.h); if(!S) return;
+  const {ctx,w,h}=S, padL=44,padR=12,padT=14,padB=34;
+  let mn=Math.min(0,Math.min.apply(null,values)),mx=Math.max.apply(null,values);
+  const pd=(mx-mn)*.15||1; mn-=pd; mx+=pd;
+  const Y=v=>padT+(h-padT-padB)*(1-(v-mn)/(mx-mn));
+  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#8fa3bf';ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.fillText(v.toFixed(v>10?0:1),6,y+3);}
+  const bw=(w-padL-padR)/values.length;
+  values.forEach((v,i)=>{
+    const x=padL+i*bw+bw*.18, y0=Y(0), y1=Y(v);
+    ctx.fillStyle=colors[i%colors.length];
+    ctx.fillRect(x,Math.min(y0,y1),bw*.64,Math.abs(y1-y0));
+    ctx.fillStyle='#c9d7ec';ctx.font='10px sans-serif';
+    if(labels){ctx.save();ctx.translate(x+bw*.3,h-padB+12);ctx.rotate(-.5);ctx.fillText(labels[i],0,0);ctx.restore();}
+    ctx.fillStyle='#e6edf7';ctx.fillText(String(v),x+bw*.12,Math.min(y0,y1)-4);
+  });
+}
+function drawScatter(cv,pts,thr){
+  const S=setup(cv,280); if(!S) return;
+  const {ctx,w,h}=S,padL=46,padR=14,padT=12,padB=30;
+  const xmn=0,xmx=100,ymn=0,ymx=Math.max.apply(null,pts.map(p=>p.y))*1.15;
+  const X=v=>padL+(w-padL-padR)*(v-xmn)/(xmx-xmn), Y=v=>padT+(h-padT-padB)*(1-(v-ymn)/(ymx-ymn));
+  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.fillStyle='#8fa3bf';ctx.font='10px sans-serif';
+  for(let g=0;g<=4;g++){const v=ymn+(ymx-ymn)*g/4,y=Y(v);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();ctx.fillText(v.toFixed(1),6,y+3);}
+  for(let g=0;g<=5;g++){const v=xmn+(xmx-xmn)*g/5,x=X(v);ctx.fillText(v.toFixed(0)+'%',x-9,h-8);}
+  pts.forEach(p=>{ctx.fillStyle=p.x>=thr?'rgba(255,110,110,.75)':'rgba(78,161,255,.75)';ctx.beginPath();ctx.arc(X(p.x),Y(p.y),3,0,6.283);ctx.fill();});
+  const xT=X(thr);ctx.setLineDash([6,4]);ctx.strokeStyle='#ffc857';ctx.lineWidth=1.6;
+  ctx.beginPath();ctx.moveTo(xT,padT);ctx.lineTo(xT,h-padB);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#ffc857';ctx.fillText('breakpoint ≈ '+thr+'%',xT+6,padT+12);
+  function fit(lo,hi,color){
+    const P=pts.filter(p=>p.x>=lo&&p.x<hi);if(P.length<3)return;
+    const n=P.length,sx=P.reduce((a,p)=>a+p.x,0),sy=P.reduce((a,p)=>a+p.y,0),
+      sxx=P.reduce((a,p)=>a+p.x*p.x,0),sxy=P.reduce((a,p)=>a+p.x*p.y,0),
+      b=(n*sxy-sx*sy)/(n*sxx-sx*sx+1e-9),a=(sy-b*sx)/n;
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+    ctx.moveTo(X(lo),Y(a+b*lo));ctx.lineTo(X(hi),Y(a+b*hi));ctx.stroke();
+    return b;
+  }
+  fit(0,thr,'#4ea1ff'); fit(thr,100,'#ff6e6e');
+}
+function drawDonut(cv,vals,colors){
+  const S=setup(cv,200); if(!S) return;
+  const {ctx,w,h}=S,cx=w/2,cy=h/2,r=Math.min(w,h)/2-8,ir=r*.62;
+  const tot=vals.reduce((a,b)=>a+b,0)||1; let a0=-Math.PI/2;
+  vals.forEach((v,i)=>{
+    const a1=a0+2*Math.PI*v/tot;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,a0,a1);ctx.closePath();ctx.fillStyle=colors[i%colors.length];ctx.fill();
+    a0=a1;
+  });
+  ctx.beginPath();ctx.arc(cx,cy,ir,0,6.283);ctx.fillStyle='#121c2e';ctx.fill();
+  ctx.fillStyle='#8fa3bf';ctx.font='11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('allocation',cx,cy+4);ctx.textAlign='start';
+}
+function drawHeat(el,rows,cols,vals,fmt){
+  const c=cols.length;
+  el.style.gridTemplateColumns='150px repeat('+c+',1fr)';
+  el.innerHTML='<div class="lbl"></div>'+cols.map(x=>'<div class="lbl" style="text-align:center">'+x+'</div>').join('');
+  rows.forEach((r,ri)=>{
+    el.innerHTML+='<div class="lbl">'+r+'</div>';
+    for(let ci=0;ci<c;ci++){
+      const v=vals[ri][ci];
+      let bg='rgba(78,161,255,'+clamp(Math.abs(v)/1.2,.06,1)+')';
+      if(v<0) bg='rgba(255,110,110,'+clamp(Math.abs(v)/1.2,.06,1)+')';
+      el.innerHTML+='<div class="cell" style="background:'+bg+'" title="'+r+' · '+cols[ci]+' = '+v+'">'+fmt(v)+'</div>';
+    }
+  });
+}
+
+/* ============================================================ RENDERERS */
+function renderOverview(){
+  drawLine(document.getElementById('cv-ov-tci'),[TCI],{colors:['#4ea1ff'],bands:BANDS,fills:[null]});
+  drawStack(document.getElementById('cv-ov-reg'),[pBull,pBear,pHigh],REGCOLORS);
+  const i=N-1,reg=REGNAMES[[pBull[i],pBear[i],pHigh[i]].indexOf(Math.max(pBull[i],pBear[i],pHigh[i]))];
+  document.getElementById('k-tci').textContent=TCI[i].toFixed(1);
+  document.getElementById('k-tcid').textContent=(TCI[i]>TCI[i-20]?'▲ ':'▼ ')+(TCI[i]-TCI[i-20]).toFixed(1)+' vs 20d ago';
+  document.getElementById('k-reg').textContent=reg;
+  document.getElementById('k-regd').textContent='P: bull '+(pBull[i]*100).toFixed(0)+'% · bear '+(pBear[i]*100).toFixed(0)+'% · hv '+(pHigh[i]*100).toFixed(0)+'%';
+  const s=SENT[i];const el=document.getElementById('k-sent');
+  el.textContent=(s>0?'+':'')+s.toFixed(2); el.className='v '+(s<0?'down':'up');
+  document.getElementById('k-sentd').textContent=s<-.2?'fear-dominant news flow':'constructive news flow';
+  const curReg=(pBull[i]>=pBear[i]&&pBull[i]>=pHigh[i])?'bull':(pBear[i]>=pHigh[i])?'bear':'highvol';
+  const netNow=NET[curReg], mi=netNow.indexOf(Math.max.apply(null,netNow));
+  document.getElementById('k-tx').textContent=ASSETS[mi].name;
+  document.getElementById('k-txd').textContent='NET +'+netNow[mi]+' in '+curReg+' regime (TVP-VAR, 10-step GFEVD)';
+  const feed=[
+   ['TCI at '+TCI[i].toFixed(1)+' — '+((TCI[i]>65)?'elevated connectivity':'moderate')+' — conditional spillovers computed for '+reg+' state.','TODAY '+fmtDate(i)],
+   ['SSCDV fear intensity rising in War/Geopolitics topic (+0.14).','T-1 '+fmtDate(i-1)],
+   ['Green bond net position '+((netNow[0]>0)?'+':'')+netNow[0]+' in '+curReg+' regime — safe-haven signal '+(netNow[0]<0?'confirmed':'not triggered')+'.','T-2 '+fmtDate(i-2)],
+   ['Regime probability transition: bear '+(pBear[i-3]*100).toFixed(0)+'% → '+(pBear[i]*100).toFixed(0)+'%.','T-3 '+fmtDate(i-3)],
+   ['Stablecoin redemption pressure below alert threshold (z = −0.4).','T-4 '+fmtDate(i-4)],
+   ['Threshold monitor: no country crossed the 20% dependence breakpoint.','T-5 '+fmtDate(i-5)],
+   ['RASTA-QF DRL agent: no position change; net-of-cost Sharpe (rolling 60d) = 1.42.','T-6 '+fmtDate(i-6)],
+   ['Weekly report auto-generated and queued for email delivery.','T-7 '+fmtDate(i-7)]
+  ];
+  document.getElementById('feed').innerHTML=feed.map(f=>'<li>'+f[0]+'<span class="t">'+f[1]+'</span></li>').join('');
+}
+
+let pairSel='GB|BTC';
+function renderConn(){
+  drawLine(document.getElementById('cv-c-tci'),[TCI],{colors:['#4ea1ff'],bands:BANDS,h:260});
+  drawBars(document.getElementById('cv-c-bar'),['Calm/bull','Bear','High-vol'],[38,74,81],['#35d0a5','#ff6e6e','#ffc857'],{h:260});
+  drawHeat(document.getElementById('hm-net'),ASSETS.map(a=>a.name),['Bull','Bear','High-vol'],
+    ASSETS.map((a,i)=>[NET.bull[i],NET.bear[i],NET.highvol[i]]),v=>(v>0?'+':'')+v);
+  const q=[.05,.1,.25,.5,.75,.9,.95], qs=q.map(x=>x.toFixed(2));
+  const spec={'GB|BTC':[-.05,-.02,.06,.14,.22,.31,.29],'GB|GOLD':[.44,.42,.35,.24,.18,.15,.17],'GB|SPX':[.10,.14,.21,.27,.30,.26,.21]};
+  const notes={'GB|BTC':'Positive tail dependence in stress: green bonds are NOT a safe haven against crypto shocks — crypto transmits into green finance at upper quantiles.',
+   'GB|GOLD':'Strong dependence in the LEFT tail only: gold and green bonds co-move in crisis (both flight-to-quality), hedging value limited in calm states.',
+   'GB|SPX':'Mild dependence rising with quantiles; conditioning on the bear regime it doubles — consistent with Gök et al. (2025) state-dependence finding.'};
+  document.getElementById('pairnote').textContent=notes[pairSel];
+  const vals=spec[pairSel];
+  drawLine(document.getElementById('cv-c-pair'),[vals],{colors:['#35d0a5'],h:240,yMin:-.1,yMax:.5,padL:40,xLabels:qs});
+}
+function renderRegime(){
+  drawStack(document.getElementById('cv-r-area'),[pBull,pBear,pHigh],REGCOLORS);
+  const i=N-1;
+  drawBars(document.getElementById('cv-r-now'),['Bull','Bear','High-vol'],[pBull[i]*100,pBear[i]*100,pHigh[i]*100],REGCOLORS,{h:120});
+  const reg=REGNAMES[[pBull[i],pBear[i],pHigh[i]].indexOf(Math.max(pBull[i],pBear[i],pHigh[i]))];
+  document.getElementById('r-note').textContent='CJM posterior: '+reg+' state since '+fmtDate(i-6)+' ('+(Math.max(pBull[i],pBear[i],pHigh[i])*100).toFixed(0)+'% confidence). Regime persistence from 5-day transition matrix below.';
+  drawHeat(document.getElementById('hm-trans'),['From Bull','From Bear','From High-vol'],
+    ['→ Bull','→ Bear','→ High-vol'],[[.93,.03,.04],[.06,.88,.06],[.05,.05,.90]],v=>v.toFixed(2));
+  /* monthly dominant state */
+  const months=[],vals=[];
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  for(let y9=2016;y9<=2024;y9++)for(let m=0;m<12;m++){
+    let sh=0,sb=0,shv=0,used=0;
+    for(let k=0;k<N;k++){if(dates[k].getFullYear()===y9&&dates[k].getMonth()===m){sh+=pBull[k];sb+=pBear[k];shv+=pHigh[k];used++}}
+    if(used){months.push(MN[m]+' '+String(y9).slice(2));
+      const mx=Math.max(sh,sb,shv); vals.push(sh===mx?0:sb===mx?1:2);}
+  }
+  const el=document.getElementById('hm-cal');
+  el.style.gridTemplateColumns='repeat(12,1fr)';
+  el.innerHTML=months.map((m,i)=>'<div class="cell" title="'+m+'" style="background:'+REGCOLORS[vals[i]]+'33;border:1px solid '+REGCOLORS[vals[i]]+'55;font-size:8.5px">'+m.split(' ')[0].slice(0,3)+'</div>').join('');
+}
+function renderSent(){
+  const topics=['War / Geopolitics','Monetary Policy','Inflation','Green Bonds','Crypto Regulation','Energy Crisis','Banking Stress','AI in Finance','Supply Chains','Climate Policy','Stablecoins','Earnings'];
+  const sens=['Fear','Anger','Anxiety','Calm','Optimism'];
+  const vals=[[.92,.75,.84,-.62,-.7],[.55,.32,.6,.1,-.05],[.6,.38,.66,-.15,-.1],[.3,.12,.25,.45,.62],[.72,.6,.4,-.2,-.35],[.68,.42,.7,-.3,-.25],[.8,.55,.72,-.4,-.42],[.2,.08,.3,.5,.75],[.48,.3,.55,-.05,.05],[.25,.15,.4,.55,.68],[.62,.4,.5,-.1,-.3],[.4,.28,.45,.3,.4]];
+  drawHeat(document.getElementById('hm-sent'),topics,sens,vals,v=>v.toFixed(2));
+  drawLine(document.getElementById('cv-s-line'),[SENT],{colors:['#a78bfa'],bands:BANDS,h:270,yMin:-1,yMax:1,hline:0});
+  const rows=[['War / Geopolitics · Fear',0.34],['Crypto Regulation · Fear',0.27],['Energy Crisis · Anxiety',0.21],['Green Bonds · Optimism (−)',-0.18],['Stablecoins · Fear',0.16],['Monetary Policy · Anxiety',0.12]];
+  document.querySelector('#t-shap tbody').innerHTML=rows.map((r,i)=>
+    '<tr><td>'+(i+1)+'</td><td>'+r[0]+'</td><td>'+(r[1]>0?'<span class="down">↑ High-vol risk</span>':'<span class="up">↓ calming</span>')+'</td><td>'+r[1].toFixed(2)+'</td></tr>').join('');
+}
+function renderThr(){
+  const pts=[];for(let k=0;k<64;k++){const x=clamp(gauss()*24+26,1,98);const y=Math.max(.05,.35+x*.004+(x>20?(x-20)*.052:0)+gauss()*.35);pts.push({x:x,y:y});}
+  drawScatter(document.getElementById('cv-t-sc'),pts,20);
+  /* stablecoin vs crypto volumes (normalised) */
+  const M=N,m=[],c=[];
+  for(let i=0;i<M;i++){const t=(300+120*Math.sin(i/200)+gauss()*25+(i>idxOf('2022-05-01')&&i<idxOf('2022-07-01')?-180:0));m.push(t);}
+  let mnv=Math.min.apply(null,m),mxv=Math.max.apply(null,m);
+  const mn2=m.map(v=>clamp((v-mnv)/(mxv-mnv)*100+8*gauss(),0,100));
+  const cr=mn2.map(v=>clamp(v*.9+18+gauss()*10,0,100));
+  drawLine(document.getElementById('cv-t-cr'),[mn2,cr],{colors:['#35d0a5','#f7931a'],h:180,mini:true,lw:1.4});
+  document.getElementById('c-share').textContent='11.4%';
+  document.getElementById('c-corr').textContent='0.94';
+  document.getElementById('c-red').textContent='Low';
+  document.getElementById('c-beta').textContent='0.21';
+}
+/* ---------- simulator ---------- */
+const SIM={GB:{mu:.00012,se:.0022,b:.15},SPX:{mu:.00045,se:.0060,b:1.0},DAX:{mu:.00035,se:.0070,b:1.05},
+  SSE:{mu:.00015,se:.0090,b:.55},GOLD:{mu:.00030,se:.0080,b:-.05},BRENT:{mu:.00010,se:.0140,b:.55},
+  GSCI:{mu:.00008,se:.0120,b:.60},BTC:{mu:.00090,se:.0300,b:.85},ETH:{mu:.00100,se:.0360,b:1.0},CE:{mu:.00035,se:.0110,b:.85}};
+const SIGM=0.0095, RF=.065;
+const RMUL={bull:{m:1.25,v:.85,sh:0},bear:{m:.15,v:1.70,sh:-.0004},highvol:{m:.55,v:2.10,sh:-.0002}};
+let W={GB:25,SPX:20,DAX:5,SSE:5,GOLD:10,BRENT:5,GSCI:3,BTC:10,ETH:2,CE:15};
+let CURREG='bull';
+function simCalc(reg){
+  const rm=RMUL[reg],sm=SIGM*rm.v,tot=Object.values(W).reduce((a,b)=>a+b,0)||1;
+  let mu=0,beta=0,idio=0,sumSig=0;
+  ASSETS.forEach(a=>{const w=W[a.id]/tot,p=SIM[a.id];
+    mu+=(p.mu*rm.m+rm.sh)*w; beta+=p.b*w; idio+=w*w*p.se*p.se*rm.v*rm.v; sumSig+=w*Math.sqrt(p.b*p.b*sm*sm+p.se*p.se*rm.v*rm.v);});
+  const varP=beta*beta*sm*sm+idio;
+  const annR=mu*252,annV=Math.sqrt(varP*252);
+  return {annR,annV,shp:(annR-RF)/(annV||1e-9),dd:.62*annV,div:sumSig/(annV/Math.sqrt(252))};
+}
+function renderSim(){
+  const box=document.getElementById('sliders');
+  box.innerHTML=ASSETS.map(a=>'<div class="row"><span class="nm" style="color:'+a.color+'">'+a.name+'</span><input type="range" min="0" max="40" value="'+W[a.id]+'" data-id="'+a.id+'"><span class="val" id="w-'+a.id+'">'+W[a.id]+'%</span></div>').join('');
+  box.querySelectorAll('input').forEach(inp=>inp.addEventListener('input',e=>{
+    W[e.target.dataset.id]=+e.target.value; document.getElementById('w-'+e.target.dataset.id).textContent=e.target.value+'%'; updateSim();
+  }));
+  updateSim();
+}
+function updateSim(){
+  const r=simCalc(CURREG),tot=Object.values(W).reduce((a,b)=>a+b,0)||1;
+  document.getElementById('s-ret').textContent=(r.annR*100).toFixed(1)+'%';
+  document.getElementById('s-vol').textContent=(r.annV*100).toFixed(1)+'%';
+  const el=document.getElementById('s-shp');el.textContent=r.shp.toFixed(2);el.className='v '+(r.shp>1?'up':r.shp<0?'down':'');
+  document.getElementById('s-dd').textContent='−'+(r.dd*100).toFixed(1)+'%';
+  document.getElementById('s-extra').innerHTML='<span>Diversification ratio: <b class="up">'+r.div.toFixed(2)+'</b></span>'+
+   '<span>Regime applied: <b>'+CURREG+'</b> (vol ×'+RMUL[CURREG].v.toFixed(2)+')</span>'+
+   '<span>Green bond weight: <b>'+((W.GB/tot)*100).toFixed(0)+'%</b></span>';
+  const vals=ASSETS.map(a=>W[a.id]);
+  const cvD=document.getElementById('cv-sim-donut');
+  drawDonut(cvD,vals,ASSETS.map(a=>a.color));
+  const oldLg=document.getElementById('donut-lg'); if(oldLg) oldLg.remove();
+  const lg=document.createElement('div');lg.className='legend';lg.id='donut-lg';
+  lg.innerHTML=ASSETS.filter(a=>W[a.id]>0).map(a=>'<span><span class="dot" style="background:'+a.color+'"></span>'+a.id+' '+(W[a.id]/tot*100).toFixed(0)+'%</span>').join('');
+  cvD.insertAdjacentElement('afterend',lg);
+  const regs=['bull','bear','highvol'],rs=regs.map(x=>simCalc(x).shp);
+  drawBars(document.getElementById('cv-sim-bars'),['Bull regime','Bear regime','High-vol regime'],rs,REGCOLORS,{h:220});
+}
+
+/* ============================================================ TABS */
+const RENDER={overview:renderOverview,conn:renderConn,regime:renderRegime,sent:renderSent,thr:renderThr,sim:renderSim,road:()=>{}};
+let ACTIVE='overview';
+function show(tab){
+  ACTIVE=tab;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  document.querySelectorAll('section.tab').forEach(s=>s.classList.toggle('on',s.id==='tab-'+tab));
+  requestAnimationFrame(()=>{if(RENDER[tab])RENDER[tab]();});
+}
+document.getElementById('nav').addEventListener('click',e=>{if(e.target.dataset.tab)show(e.target.dataset.tab)});
+document.getElementById('pairseg').addEventListener('click',e=>{
+  if(!e.target.dataset.p)return;
+  pairSel=e.target.dataset.p;
+  document.querySelectorAll('#pairseg button').forEach(b=>b.classList.toggle('on',b===e.target));
+  renderConn();
+});
+document.getElementById('regseg').addEventListener('click',e=>{
+  if(!e.target.dataset.r)return;
+  CURREG=e.target.dataset.r;
+  document.querySelectorAll('#regseg button').forEach(b=>b.classList.toggle('on',b===e.target));
+  updateSim();
+});
+let RT;window.addEventListener('resize',()=>{clearTimeout(RT);RT=setTimeout(()=>RENDER[ACTIVE]&&RENDER[ACTIVE](),180)});
+document.addEventListener('DOMContentLoaded',()=>show('overview'));
+if(document.readyState!=='loading') show('overview');
+</script>
+</body>
+</html>
